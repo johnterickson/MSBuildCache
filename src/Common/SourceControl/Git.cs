@@ -77,6 +77,7 @@ internal static class Git
 
 #if NETFRAMEWORK
                 process.WaitForExit();
+                cancellationToken.ThrowIfCancellationRequested();
 #else
                 await process.WaitForExitAsync(cancellationToken);
 #endif
