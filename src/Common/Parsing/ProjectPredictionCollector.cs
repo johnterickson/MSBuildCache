@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Graph;
 using Microsoft.Build.Prediction;
@@ -108,7 +109,17 @@ internal sealed class ProjectPredictionCollector : IProjectPredictionCollector
             }
 
             // Remove any \.\ or \..\ stuff
-            absolutePath = Path.GetFullPath(absolutePath);
+            // Path.GetFullPath doesn't handle wildcards
+            if (absolutePath.Any((c) => c == '*'))
+            {
+                absolutePath = absolutePath.Replace("*", "1234STAR4321", StringComparison.Ordinal);
+                absolutePath = Path.GetFullPath(absolutePath);
+                absolutePath = absolutePath.Replace("1234STAR4321", "*", StringComparison.Ordinal);
+            }
+            else
+            {
+                absolutePath = Path.GetFullPath(absolutePath);
+            }
 
             // Always trim trailing slashes
             absolutePath = absolutePath.TrimEnd(DirectorySeparatorChars);
