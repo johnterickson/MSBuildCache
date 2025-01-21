@@ -1061,7 +1061,7 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
         logger.LogMessage("Source Control: Getting hashes");
         Stopwatch stopwatch = Stopwatch.StartNew();
 
-        GitFileHashProvider hashProvider = new(logger);
+        GitFileHashProvider hashProvider = new(logger, Settings!);
         IReadOnlyDictionary<string, byte[]> fileHashes = await hashProvider.GetFileHashesAsync(_repoRoot, cancellationToken);
         logger.LogMessage($"Source Control: File hashes query took {stopwatch.ElapsedMilliseconds} ms");
 
@@ -1260,7 +1260,7 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
     }
 
     private static void TimeAndLog(PluginLoggerBase? logger, Action inner, string? context = null, [CallerMemberName] string memberName = "")
-        => TimeAndLogAsync<int>(logger, () => { inner(); return Task.FromResult(0); }, CancellationToken.None, context, memberName).GetAwaiter().GetResult();
+        => TimeAndLogAsync(logger, () => { inner(); return Task.FromResult(0); }, CancellationToken.None, context, memberName).GetAwaiter().GetResult();
 }
 
 public static class ProjectGraphNodeExtensions

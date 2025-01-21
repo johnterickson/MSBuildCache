@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using BuildXL.Utilities.Core.Tasks;
@@ -39,10 +40,12 @@ internal sealed class GitFileHashProvider : ISourceControlFileHashProvider
     private static readonly char[] SegmentDelimiters = { ' ', '\t' };
 
     private readonly PluginLoggerBase _logger;
+    private readonly PluginSettings _settings;
 
-    public GitFileHashProvider(PluginLoggerBase logger)
+    public GitFileHashProvider(PluginLoggerBase logger, PluginSettings settings)
     {
         _logger = logger;
+        _settings = settings;
     }
 
     /// <summary>
@@ -98,24 +101,65 @@ internal sealed class GitFileHashProvider : ISourceControlFileHashProvider
 
     private async Task<Dictionary<string, byte[]>> GetModuleFileHashesAsync(string basePath, CancellationToken cancellationToken)
     {
-        return await Git.RunAsync(
+        string commitId = await Git.RunAsync(
             _logger,
             workingDir: basePath,
-            "ls-files -z -cmos --exclude-standard",
-            (_, stdout) => Task.Run(() => ParseGitLsFiles(basePath, stdout, (filesToRehash, fileHashes) => GitHashObjectAsync(basePath, filesToRehash, fileHashes, cancellationToken))),
+            "log -1 --format=%H",
+            async (_, stdout) =>
+            {
+                string commitId = await stdout.ReadToEndAsync(cancellationToken);
+                return commitId.Trim();
+            },
             (exitCode, result) =>
             {
                 if (exitCode != 0)
                 {
-                    throw new SourceControlHashException("git ls-files failed with exit code  " + exitCode);
+                    throw new SourceControlHashException("`git log -1 --format=%H` failed with exit code  " + exitCode);
                 }
 
                 return result;
             },
             cancellationToken);
+
+        string? hashCachePath = null;
+        if (!string.IsNullOrWhiteSpace(commitId))
+        {
+            hashCachePath = Path.Combine(_settings.LocalCacheRootPath, commitId);
+        }
+
+        if (hashCachePath != null && File.Exists(hashCachePath))
+        {
+            using Stream hashCache = File.OpenRead(hashCachePath);
+            return (await JsonSerializer.DeserializeAsync<Dictionary<string, byte[]>>(hashCache, cancellationToken: cancellationToken))!;
+        }
+
+        Dictionary<string, byte[]> hashes = await Git.RunAsync(
+            _logger,
+            workingDir: basePath,
+            "ls-files -z -cmos --exclude-standard",
+            (_, stdout) => Task.Run(() => ParseGitLsFilesAsync(basePath, stdout, (filesToRehash, fileHashes) => GitHashObjectAsync(basePath, filesToRehash, fileHashes, cancellationToken))),
+            (exitCode, result) =>
+            {
+                if (exitCode != 0)
+                {
+                    throw new SourceControlHashException("`git ls-files` failed with exit code  " + exitCode);
+                }
+
+                return result;
+            },
+            cancellationToken);
+
+        if (hashCachePath != null && !File.Exists(hashCachePath))
+        {
+            using Stream hashCache = File.OpenWrite(hashCachePath);
+            await JsonSerializer.SerializeAsync(hashCache, hashes, cancellationToken: cancellationToken);
+            await hashCache.FlushAsync(cancellationToken);
+        }
+
+        return hashes;
     }
 
-    internal async Task<Dictionary<string, byte[]>> ParseGitLsFiles(
+    internal async Task<Dictionary<string, byte[]>> ParseGitLsFilesAsync(
         string basePath,
         TextReader gitOutput,
         Func<List<string>, Dictionary<string, byte[]>, Task> hasher)
