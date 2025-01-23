@@ -55,7 +55,7 @@ public sealed class MSBuildCacheAzurePipelinesPlugin : MSBuildCachePluginBase
             localCacheSession,
             cacheLogger,
             Settings.CacheUniverse,
-            Settings.RepoRoot,
+            Settings.BuildRoot,
             NugetPackageRoot,
             GetFileRealizationMode,
             Settings.MaxConcurrentCacheContentOperations,

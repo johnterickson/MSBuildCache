@@ -53,14 +53,15 @@ public class PluginSettings
     private string _logDirectory = "MSBuildCacheLogs";
     private string? _localCacheRootPath;
 
-    public required string RepoRoot { get; init; }
+    public string RepositoryRoot { get; private set; } = "";
+    public string BuildRoot { get; private set; } = "";
 
     /// <summary>
     /// Base directory to use for logging. If a relative path, it's assumed relative to the repo root.
     /// </summary>
     public string LogDirectory
     {
-        get => Path.Combine(RepoRoot, _logDirectory);
+        get => Path.IsPathRooted(_logDirectory) ? _logDirectory : Path.Combine(BuildRoot, _logDirectory);
         init => _logDirectory = value;
     }
 
@@ -74,7 +75,7 @@ public class PluginSettings
     public string LocalCacheRootPath
     {
         get => string.IsNullOrEmpty(_localCacheRootPath)
-                ? Path.Combine(Path.GetPathRoot(RepoRoot)!, "MSBuildCache")
+                ? Path.Combine(Path.GetPathRoot(BuildRoot)!, "MSBuildCache")
                 : _localCacheRootPath!;
         init => _localCacheRootPath = value;
     }
@@ -121,6 +122,27 @@ public class PluginSettings
         logMessage.AppendLine("Effective plugin settings:");
 
         PropertyInfo[] properties = typeof(T).GetProperties();
+
+        pluginSettings.RepositoryRoot = repoRoot;
+        if (settings.TryGetValue(nameof(BuildRoot), out string? buildRoot) && !string.IsNullOrEmpty(buildRoot))
+        {
+            if (Path.IsPathRooted(buildRoot))
+            {
+                pluginSettings.BuildRoot = Path.GetFullPath(buildRoot);
+                logMessage.AppendLine($"BuildRoot is defined: {pluginSettings.BuildRoot}");
+            }
+            else
+            {
+                pluginSettings.BuildRoot = Path.GetFullPath(Path.Combine(pluginSettings.RepositoryRoot, buildRoot));
+                logMessage.AppendLine($"BuildRoot is not absolute so rooting it to RepositoryRoot: {pluginSettings.BuildRoot}");
+            }
+        }
+        else
+        {
+            logMessage.AppendLine("BuildRoot is undefined so using RepositoryRoot");
+            pluginSettings.BuildRoot = pluginSettings.RepositoryRoot;
+        }
+
         foreach (PropertyInfo property in properties)
         {
             if (!property.CanRead || !property.CanWrite)
@@ -130,18 +152,17 @@ public class PluginSettings
 
             string propertyName = property.Name;
 
-            // Special-case RepoRoot since it's not a setting but provided separately.
-            if (propertyName.Equals(nameof(RepoRoot), StringComparison.Ordinal))
+            // Special-case RepoRoot and BuildRoot since it's not a setting but provided separately.
+            if (propertyName.Equals(nameof(RepositoryRoot), StringComparison.Ordinal)
+                || propertyName.Equals(nameof(BuildRoot), StringComparison.Ordinal))
             {
-                MethodInfo setMethod = property.GetSetMethod(nonPublic: true)!;
-                _ = setMethod.Invoke(pluginSettings, new[] { repoRoot });
                 continue;
             }
 
             object? settingValue = null;
             if (settings.TryGetValue(propertyName, out string? rawSettingValue))
             {
-                SettingParseResult parseResult = TryParseSettingValue(property.PropertyType, rawSettingValue, repoRoot, out settingValue);
+                SettingParseResult parseResult = TryParseSettingValue(property.PropertyType, rawSettingValue, pluginSettings.BuildRoot, out settingValue);
                 switch (parseResult)
                 {
                     case SettingParseResult.Success:
@@ -209,7 +230,7 @@ public class PluginSettings
     private static SettingParseResult TryParseSettingValue(
         Type type,
         string rawSettingValue,
-        string repoRoot,
+        string buildRoot,
         out object? settingValue)
     {
         rawSettingValue = rawSettingValue.Trim();
@@ -279,7 +300,7 @@ public class PluginSettings
             if (firstDirSeparator == -1)
             {
                 // This looks like a match on the file name, so prepend a recursive match under the repo.
-                globSpec = Path.Combine(repoRoot, "**", globSpec);
+                globSpec = Path.Combine(buildRoot, "**", globSpec);
             }
             else if (firstDirSeparator == 0)
             {
@@ -290,7 +311,7 @@ public class PluginSettings
             else if (!Path.IsPathRooted(globSpec))
             {
                 // Root the path if needed.
-                globSpec = Path.Combine(repoRoot, globSpec);
+                globSpec = Path.Combine(buildRoot, globSpec);
             }
 
             try
@@ -312,7 +333,7 @@ public class PluginSettings
             Type? elementType = type.GetElementType();
             if (elementType != null)
             {
-                SettingParseResult collectionParseResult = TryParseCollectionSetting(elementType, rawSettingValue, repoRoot, out object[]? elementValues);
+                SettingParseResult collectionParseResult = TryParseCollectionSetting(elementType, rawSettingValue, buildRoot, out object[]? elementValues);
                 if (collectionParseResult != SettingParseResult.Success
                     || elementValues == null
                     || elementValues.Length == 0)
@@ -338,7 +359,7 @@ public class PluginSettings
                 Type? elementType = genericTypeArguments[0];
                 if (elementType != null)
                 {
-                    SettingParseResult collectionParseResult = TryParseCollectionSetting(elementType, rawSettingValue, repoRoot, out object[]? elementValues);
+                    SettingParseResult collectionParseResult = TryParseCollectionSetting(elementType, rawSettingValue, buildRoot, out object[]? elementValues);
                     if (collectionParseResult != SettingParseResult.Success
                         || elementValues == null
                         || elementValues.Length == 0)
@@ -400,7 +421,7 @@ public class PluginSettings
     private static SettingParseResult TryParseCollectionSetting(
         Type elementType,
         string rawSettingValue,
-        string repoRoot,
+        string buildRoot,
         out object[]? values)
     {
         string[] rawValues = rawSettingValue.Split(
@@ -422,7 +443,7 @@ public class PluginSettings
         for (int i = 0; i < rawValues.Length; i++)
         {
             string rawValue = rawValues[i];
-            SettingParseResult parseResult = TryParseSettingValue(elementType, rawValue, repoRoot, out object? elementValue);
+            SettingParseResult parseResult = TryParseSettingValue(elementType, rawValue, buildRoot, out object? elementValue);
             if (parseResult != SettingParseResult.Success)
             {
                 values = null;

@@ -103,7 +103,7 @@ public sealed class MSBuildCacheAzureBlobStoragePlugin : MSBuildCachePluginBase<
             localCacheSession,
             (remoteCache, remoteCacheSession, twoLevelConfig),
             ContentHasher,
-            Settings.RepoRoot,
+            Settings.BuildRoot,
             NugetPackageRoot,
             GetFileRealizationMode,
             Settings.MaxConcurrentCacheContentOperations,

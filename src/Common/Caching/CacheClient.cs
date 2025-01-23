@@ -49,7 +49,7 @@ public abstract class CacheClient : ICacheClient
         Context rootContext,
         IFingerprintFactory fingerprintFactory,
         IContentHasher hasher,
-        string repoRoot,
+        string buildRoot,
         string nugetPackageRoot,
         Func<string, FileRealizationMode> getFileRealizationMode,
         ICache localCache,
@@ -63,7 +63,7 @@ public abstract class CacheClient : ICacheClient
         _fingerprintFactory = fingerprintFactory;
         _hasher = hasher;
         EmptySelector = new(hasher.Info.EmptyHash, EmptySelectorOutput);
-        RepoRoot = repoRoot;
+        BuildRoot = buildRoot;
         _nugetPackageRoot = nugetPackageRoot;
         _localCache = localCache;
         LocalCacheSession = localCas;
@@ -94,7 +94,7 @@ public abstract class CacheClient : ICacheClient
 
         if (skipUnchangedOutputFiles)
         {
-            _localCacheStateManager = new LocalCacheStateManager(repoRoot);
+            _localCacheStateManager = new LocalCacheStateManager(buildRoot);
         }
     }
 
@@ -102,7 +102,7 @@ public abstract class CacheClient : ICacheClient
 
     protected Context RootContext { get; }
 
-    protected string RepoRoot { get; }
+    protected string BuildRoot { get; }
 
     protected Selector EmptySelector { get; }
 
@@ -325,7 +325,7 @@ public abstract class CacheClient : ICacheClient
             // TODO: This is too late for the local cache in the async publishing case as outputs are ingested into the local cache as part of hashing.
             if (!nodeBuildResult.PackageFilesToCopy.ContainsKey(kvp.Key))
             {
-                outputsToCache.Add(Path.Combine(RepoRoot, kvp.Key), kvp.Value);
+                outputsToCache.Add(Path.Combine(BuildRoot, kvp.Key), kvp.Value);
             }
         }
 
@@ -476,7 +476,7 @@ public abstract class CacheClient : ICacheClient
             Dictionary<string, ContentHash> outputsToPlace = new(outputsToPlaceSizeEstimate);
             foreach (KeyValuePair<string, ContentHash> kvp in outputs)
             {
-                string destinationAbsolutePath = Path.Combine(RepoRoot, kvp.Key);
+                string destinationAbsolutePath = Path.Combine(BuildRoot, kvp.Key);
                 if (nodeBuildResult.PackageFilesToCopy.TryGetValue(kvp.Key, out string? packageFile))
                 {
                     string sourceAbsolutePath = Path.Combine(_nugetPackageRoot, packageFile);

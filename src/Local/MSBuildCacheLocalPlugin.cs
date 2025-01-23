@@ -57,7 +57,7 @@ public sealed class MSBuildCacheLocalPlugin : MSBuildCachePluginBase
             cacheSession,
             remoteCache: null,
             ContentHasher,
-            Settings.RepoRoot,
+            Settings.BuildRoot,
             NugetPackageRoot,
             GetFileRealizationMode,
             Settings.MaxConcurrentCacheContentOperations,

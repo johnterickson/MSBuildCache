@@ -236,7 +236,7 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
         }
 
         NugetPackageRoot = GetNuGetPackageRoot();
-        _pathNormalizer = new PathNormalizer(_repoRoot, NugetPackageRoot);
+        _pathNormalizer = new PathNormalizer(_repoRoot, Settings.BuildRoot, NugetPackageRoot);
 
         WarnOnCowWithDifferingVolumes(logger);
 
@@ -1028,25 +1028,24 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
 
     private void WarnOnCowWithDifferingVolumes(PluginLoggerBase logger)
     {
-        if (_repoRoot is null
-            || NugetPackageRoot is null
+        if (NugetPackageRoot is null
             || Settings is null)
         {
             throw new InvalidOperationException();
         }
 
         ICopyOnWriteFilesystem copyOnWriteFilesystem = CopyOnWriteFilesystemFactory.GetInstance();
-        if (copyOnWriteFilesystem.CopyOnWriteLinkSupportedInDirectoryTree(_repoRoot))
+        if (copyOnWriteFilesystem.CopyOnWriteLinkSupportedInDirectoryTree(Settings.BuildRoot))
         {
-            WarnIfCowNotSupportedBetweenRepoRootAndPath(NugetPackageRoot, "NuGet package root");
-            WarnIfCowNotSupportedBetweenRepoRootAndPath(Settings.LocalCacheRootPath, "local cache");
+            WarnIfCowNotSupportedBetweenBuildRootAndPath(NugetPackageRoot, "NuGet package root");
+            WarnIfCowNotSupportedBetweenBuildRootAndPath(Settings.LocalCacheRootPath, "local cache");
         }
 
-        void WarnIfCowNotSupportedBetweenRepoRootAndPath(string path, string pathDescription)
+        void WarnIfCowNotSupportedBetweenBuildRootAndPath(string path, string pathDescription)
         {
-            if (!copyOnWriteFilesystem.CopyOnWriteLinkSupportedBetweenPaths(_repoRoot, path, pathsAreFullyResolved: true))
+            if (!copyOnWriteFilesystem.CopyOnWriteLinkSupportedBetweenPaths(Settings.BuildRoot, path, pathsAreFullyResolved: true))
             {
-                logger.LogWarning($"The repository path '{_repoRoot}' supports copy-on-write but the {pathDescription} '{path}' resides on a different volume. This may impact performance.");
+                logger.LogWarning($"The build root '{Settings.BuildRoot}' supports copy-on-write but the {pathDescription} '{path}' resides on a different volume. This may impact performance.");
             }
         }
     }

@@ -21,13 +21,13 @@ internal sealed class LocalCacheStateManager
     private const string CacheStateDirName = ".msbuildcache";
 
     private readonly Tracer _tracer = new(nameof(LocalCacheStateManager));
-    private readonly string _repoRoot;
+    private readonly string _buildRoot;
     private readonly string _cacheStateDir;
 
-    public LocalCacheStateManager(string repoRoot)
+    public LocalCacheStateManager(string buildRoot)
     {
-        _repoRoot = repoRoot;
-        _cacheStateDir = Path.Combine(repoRoot, CacheStateDirName);
+        _buildRoot = buildRoot;
+        _cacheStateDir = Path.Combine(buildRoot, CacheStateDirName);
     }
 
     internal async Task WriteStateFileAsync(
@@ -39,7 +39,7 @@ internal sealed class LocalCacheStateManager
         {
             string relativeFilePath = kvp.Key;
             ContentHash contentHash = kvp.Value;
-            FileInfo fileInfo = new(Path.Combine(_repoRoot, relativeFilePath));
+            FileInfo fileInfo = new(Path.Combine(_buildRoot, relativeFilePath));
             files[relativeFilePath] = new LocalCacheStateEntry(contentHash.ToShortString(), fileInfo.LastWriteTimeUtc.Ticks, fileInfo.Length);
         }
 
@@ -57,7 +57,7 @@ internal sealed class LocalCacheStateManager
         NodeContext nodeContext,
         NodeBuildResult nodeBuildResult)
     {
-        string stateFilePath = Path.Combine(_repoRoot, CacheStateDirName, nodeContext.Id + ".json");
+        string stateFilePath = Path.Combine(_buildRoot, CacheStateDirName, nodeContext.Id + ".json");
 
         LocalCacheStateFile? depFile = null;
         if (File.Exists(stateFilePath))
@@ -119,7 +119,7 @@ internal sealed class LocalCacheStateManager
             return false;
         }
 
-        FileInfo fileInfo = new(Path.Combine(_repoRoot, relativeFilePath));
+        FileInfo fileInfo = new(Path.Combine(_buildRoot, relativeFilePath));
         if (!fileInfo.Exists)
         {
             _tracer.Debug(context, $"File {relativeFilePath} was out of date. The file does not exist.");

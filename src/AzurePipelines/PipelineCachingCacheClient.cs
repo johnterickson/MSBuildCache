@@ -99,7 +99,7 @@ internal sealed class PipelineCachingCacheClient : CacheClient
         IContentSession localCAS,
         ILogger logger,
         string universe,
-        string repoRoot,
+        string buildRoot,
         string nugetPackageRoot,
         Func<string, FileRealizationMode> getFileRealizationMode,
         int maxConcurrentCacheContentOperations,
@@ -107,7 +107,7 @@ internal sealed class PipelineCachingCacheClient : CacheClient
         bool enableAsyncPublishing,
         bool enableAsyncMaterialization,
         bool skipUnchangedOutputFiles)
-        : base(rootContext, fingerprintFactory, hasher, repoRoot, nugetPackageRoot, getFileRealizationMode, localCache, localCAS, maxConcurrentCacheContentOperations, enableAsyncPublishing, enableAsyncMaterialization, skipUnchangedOutputFiles)
+        : base(rootContext, fingerprintFactory, hasher, buildRoot, nugetPackageRoot, getFileRealizationMode, localCache, localCAS, maxConcurrentCacheContentOperations, enableAsyncPublishing, enableAsyncMaterialization, skipUnchangedOutputFiles)
     {
         _remoteCacheIsReadOnly = remoteCacheIsReadOnly;
         _universe = $"pccc-{(int)hasher.Info.HashType}-{InternalSeed}-" + (string.IsNullOrEmpty(universe) ? "DEFAULT" : universe);
@@ -268,7 +268,7 @@ internal sealed class PipelineCachingCacheClient : CacheClient
             }
 
             var result = await WithHttpRetries(
-                () => _manifestClient.PublishAsync(RepoRoot, infos, extras, new ArtifactPublishOptions(), manifestFileOutputPath: null, cancellationToken),
+                () => _manifestClient.PublishAsync(BuildRoot, infos, extras, new ArtifactPublishOptions(), manifestFileOutputPath: null, cancellationToken),
                 cacheContext: context,
                 message: $"Publishing content for {fingerprint}",
                 cancellationToken);
@@ -561,7 +561,7 @@ internal sealed class PipelineCachingCacheClient : CacheClient
             await File.WriteAllTextAsync(tempManifestFile.Path, JsonSerializer.Serialize(tempManifest), cancellationToken);
 #endif
 
-            var manifestOptions = DownloadDedupManifestArtifactOptions.CreateWithManifestPath(tempManifestFile.Path, _client.RepoRoot);
+            var manifestOptions = DownloadDedupManifestArtifactOptions.CreateWithManifestPath(tempManifestFile.Path, _client.BuildRoot);
 
             await _client.WithHttpRetries(
                 async () =>
@@ -764,13 +764,13 @@ internal sealed class PipelineCachingCacheClient : CacheClient
         }
 
         // Make the path absolute
-        return Path.Combine(RepoRoot, path);
+        return Path.Combine(BuildRoot, path);
     }
 
     private string ConvertAbsolutePathToUriPath(string path)
     {
         // Make the path relative
-        path = path.MakePathRelativeTo(RepoRoot)!;
+        path = path.MakePathRelativeTo(BuildRoot)!;
 
         // Replace platform-specific directory separator with '/'
         if (Path.DirectorySeparatorChar != '/')

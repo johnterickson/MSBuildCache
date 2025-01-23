@@ -16,15 +16,18 @@ namespace Microsoft.MSBuildCache;
 public sealed class PathNormalizer
 {
     private const string RepoRootPlaceholder = "{RepoRoot}";
+    private const string BuildRootPlaceholder = "{BuildRoot}";
     private const string NugetPackageRootPlaceholder = "{NugetPackageRoot}";
 
     private readonly string _repoRoot;
+    private readonly string _buildRoot;
 
     private readonly string _nugetPackageRoot;
 
-    public PathNormalizer(string repoRoot, string nugetPackageRoot)
+    public PathNormalizer(string repoRoot, string buildRoot, string nugetPackageRoot)
     {
         _repoRoot = EnsureTrailingSlash(Path.GetFullPath(repoRoot));
+        _buildRoot = EnsureTrailingSlash(Path.GetFullPath(buildRoot));
         _nugetPackageRoot = EnsureTrailingSlash(Path.GetFullPath(nugetPackageRoot));
 
         static string EnsureTrailingSlash(string path) => path[path.Length - 1] == '\\' ? path : (path + '\\');
@@ -33,10 +36,12 @@ public sealed class PathNormalizer
     public string Normalize(string path)
         => path
             .Replace(_repoRoot, RepoRootPlaceholder, StringComparison.OrdinalIgnoreCase)
-            .Replace(_nugetPackageRoot, NugetPackageRootPlaceholder, StringComparison.OrdinalIgnoreCase);
+            .Replace(_nugetPackageRoot, NugetPackageRootPlaceholder, StringComparison.OrdinalIgnoreCase)
+            .Replace(_buildRoot, BuildRootPlaceholder, StringComparison.OrdinalIgnoreCase);
 
     public string Unnormalize(string normalized)
         => normalized
             .Replace(RepoRootPlaceholder, _repoRoot, StringComparison.Ordinal)
-            .Replace(NugetPackageRootPlaceholder, _nugetPackageRoot, StringComparison.Ordinal);
+            .Replace(NugetPackageRootPlaceholder, _nugetPackageRoot, StringComparison.Ordinal)
+            .Replace(BuildRootPlaceholder, _buildRoot, StringComparison.Ordinal);
 }
