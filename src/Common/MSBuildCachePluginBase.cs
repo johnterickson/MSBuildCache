@@ -124,7 +124,8 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
         nameof(_cacheClient),
         nameof(_ignoredOutputPatterns),
         nameof(_identicalDuplicateOutputPatterns),
-        nameof(_getCacheResultAsync)
+        nameof(_getCacheResultAsync),
+        nameof(Settings)
     )]
     protected bool Initialized { get; private set; }
 
@@ -580,7 +581,7 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
             string normalizedFilePath = _pathNormalizer.Normalize(absolutePath);
             await observedInputsWriter.WriteLineAsync(normalizedFilePath);
 
-            string? relativeFilePath = absolutePath.MakePathRelativeTo(_repoRoot);
+            string? relativeFilePath = absolutePath.MakePathRelativeTo(Settings.BuildRoot);
             if (relativeFilePath != null && _outputProducer.TryGetValue(relativeFilePath, out NodeContext? producerContext))
             {
                 if (!nodeContext.IsDependentOn(producerContext))
@@ -635,7 +636,7 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
                     return false;
                 }
 
-                string? relativeFilePath = output.MakePathRelativeTo(_repoRoot!);
+                string? relativeFilePath = output.MakePathRelativeTo(Settings.BuildRoot);
                 if (relativeFilePath != null)
                 {
                     outputPathToRelativePath.Add(output, relativeFilePath);
@@ -1163,7 +1164,7 @@ public abstract class MSBuildCachePluginBase<TPluginSettings> : ProjectCachePlug
             }
 
             // This is only allowed if marked as a duplicate-identical output
-            string absoluteFilePath = Path.Combine(_repoRoot!, relativeFilePath);
+            string absoluteFilePath = Path.Combine(Settings!.BuildRoot, relativeFilePath);
             if (!IsDuplicateIdenticalOutputPath(logger, absoluteFilePath))
             {
                 logger.LogError($"Node {nodeContext.Id} produced output {relativeFilePath} which was already produced by another node {_outputProducer[relativeFilePath].Id}.");
